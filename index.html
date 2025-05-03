@@ -1,0 +1,489 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Graph Traversal Visualizer</title>
+  <style>
+    :root {
+      --bg-color: #121212;
+      --panel-color: #1e1e1e;
+      --border-color: #2c2c2c;
+      --text-color: #ffffff;
+      --accent-color: #00bcd4;
+      --accent-hover: #03a9f4;
+    }
+  
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', Roboto, sans-serif;
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 0 10px;
+    }
+  
+    h2 {
+      margin-top: 20px;
+      color: var(--accent-color);
+      font-size: 1.8rem;
+    }
+  
+    #controls {
+      margin: 20px auto;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      justify-content: center;
+      max-width: 1000px;
+      padding: 15px;
+      background-color: var(--panel-color);
+      border-radius: 12px;
+      border: 1px solid var(--border-color);
+      box-shadow: 0 0 10px rgba(0, 188, 212, 0.1);
+    }
+  
+    button, select, input[type="file"], label {
+      padding: 10px 16px;
+      font-size: 14px;
+      color: var(--text-color);
+      background-color: var(--bg-color);
+      border: 1px solid var(--accent-color);
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background-color 0.2s ease, transform 0.1s ease;
+    }
+  
+    button:hover, select:hover, input[type="file"]:hover {
+      background-color: var(--accent-hover);
+      color: #000;
+      transform: translateY(-2px);
+    }
+  
+    canvas {
+      border: 2px solid var(--accent-color);
+      border-radius: 10px;
+      margin-bottom: 30px;
+      max-width: 100%;
+      height: auto;
+      background-color: var(--panel-color);
+    }
+  
+    input[type="file"] {
+      color: var(--text-color);
+    }
+    .edge-weight {
+    color: #ffffff;
+    font-weight: bold;
+    font-size: 16px;
+  }
+  
+    @media (max-width: 768px) {
+      #controls {
+        flex-direction: column;
+        align-items: center;
+      }
+  
+      button, select, input[type="file"] {
+        width: 90%;
+        max-width: 300px;
+      }
+  
+      canvas {
+        width: 100%;
+        height: auto;
+      }
+    }
+    /* Style for the alert box */
+.alert-box {
+  display: none;
+  position: fixed;
+  top: 20%;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: #333;
+  color: #ffffff;
+  border: 2px solid #00bcd4;
+  padding: 20px;
+  border-radius: 10px;
+  font-size: 16px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+  z-index: 1000;
+  text-align: center;
+  min-width: 300px;
+}
+
+/* Style for the success alert */
+.alert-success {
+  background-color: #2ecc71;
+  border-color: #27ae60;
+}
+
+/* Style for the error alert */
+.alert-error {
+  background-color: #e74c3c;
+  border-color: #c0392b;
+}
+
+/* Close button style */
+.alert-close-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background-color: transparent;
+  color: #ffffff;
+  border: none;
+  font-size: 18px;
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.alert-close-btn:hover {
+  color: #ff6347;
+}
+
+  </style>
+  
+</head>
+<body>
+  <h2>Graph Traversal Visualizer - Hruthwik M</h2>
+
+  <div id="controls">
+    <button onclick="setMode('node')">Add Node</button>
+    <button onclick="setMode('edge')">Add Edge (Weighted)</button>
+    <label>
+      <input type="checkbox" id="directionToggle"> Bidirectional
+    </label>
+    <select id="algo">
+      <option value="dfs">DFS</option>
+      <option value="bfs">BFS</option>
+      <option value="dijkstra">Dijkstra</option>
+      <option value="astar">A*</option>
+    </select>
+    <button onclick="startTraversal()">Play</button>
+    <button onclick="stepTraversal(-1)">Previous</button>
+    <button onclick="stepTraversal(1)">Next</button>
+    <button onclick="pauseTraversal()">Pause</button>
+    <button onclick="undoLast()">Undo</button>
+    <button onclick="resetGraph()">Reset</button>
+    <button onclick="exportGraph()">Export</button>
+    <input type="file" id="importFile" onchange="importGraph(event)" />
+    <button onclick="checkCycle()">Check Cycle</button>
+    <button onclick="checkConnectivity()">Check Connectivity</button>
+  </div>
+
+  <canvas id="graphCanvas" width="1000" height="600"></canvas>
+
+  <script>
+    const canvas = document.getElementById("graphCanvas");
+    const ctx = canvas.getContext("2d");
+    const radius = 20;
+
+    let nodes = [];
+    let edges = [];
+    let nodeId = 0;
+    let mode = "node";
+    let edgeStart = null;
+    let history = [];
+    let traversalSteps = [];
+    let currentStep = 0;
+    let playInterval = null;
+
+    function setMode(m) {
+      mode = m;
+      edgeStart = null;
+    }
+
+    function saveHistory() {
+      history.push({
+        nodes: JSON.parse(JSON.stringify(nodes)),
+        edges: JSON.parse(JSON.stringify(edges)),
+        nodeId
+      });
+    }
+
+    function undoLast() {
+      if (history.length > 0) {
+        const state = history.pop();
+        nodes = state.nodes;
+        edges = state.edges;
+        nodeId = state.nodeId;
+        drawGraph();
+      }
+    }
+
+    canvas.addEventListener("click", e => {
+      const rect = canvas.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+
+      if (mode === "node") {
+        saveHistory();
+        nodes.push({ id: nodeId++, x, y });
+        drawGraph();
+      } else if (mode === "edge") {
+        const clickedNode = getClickedNode(x, y);
+        if (clickedNode) {
+          if (!edgeStart) {
+            edgeStart = clickedNode;
+          } else {
+            if (edgeStart.id !== clickedNode.id) {
+              saveHistory();
+              const weight = parseInt(prompt("Enter edge weight:", "1")) || 1;
+              const bidirectional = document.getElementById("directionToggle").checked;
+              edges.push({ from: edgeStart.id, to: clickedNode.id, weight });
+              if (bidirectional) edges.push({ from: clickedNode.id, to: edgeStart.id, weight });
+              edgeStart = null;
+              drawGraph();
+            }
+          }
+        }
+      }
+    });
+
+    function getClickedNode(x, y) {
+      return nodes.find(n => Math.hypot(n.x - x, n.y - y) < radius);
+    }
+
+    function drawGraph(path = [], visited = new Set()) {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      edges.forEach(e => {
+        const from = nodes.find(n => n.id === e.from);
+        const to = nodes.find(n => n.id === e.to);
+
+        const angle = Math.atan2(to.y - from.y, to.x - from.x);
+        const tx = to.x - radius * Math.cos(angle);
+        const ty = to.y - radius * Math.sin(angle);
+
+        ctx.beginPath();
+        ctx.moveTo(from.x, from.y);
+        ctx.lineTo(tx, ty);
+        ctx.strokeStyle = "#888";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.moveTo(tx, ty);
+        ctx.lineTo(tx - 10 * Math.cos(angle - Math.PI / 6), ty - 10 * Math.sin(angle - Math.PI / 6));
+        ctx.lineTo(tx - 10 * Math.cos(angle + Math.PI / 6), ty - 10 * Math.sin(angle + Math.PI / 6));
+        ctx.closePath();
+        ctx.fillStyle = "#888";
+        ctx.fill();
+
+        ctx.fillStyle = "#ffffff";  
+        ctx.font = "bold 16px Arial";
+        ctx.fillText(e.weight, (from.x + to.x) / 2, (from.y + to.y) / 2);
+      });
+
+      nodes.forEach(n => {
+        ctx.beginPath();
+        ctx.arc(n.x, n.y, radius, 0, 2 * Math.PI);
+        ctx.fillStyle = visited.has(n.id) ? "#2ecc71" : "#3498db";
+        ctx.strokeStyle = path.includes(n.id) ? "#e74c3c" : "#2980b9";
+        ctx.lineWidth = path.includes(n.id) ? 4 : 2;
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = "#fff";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(n.id, n.x, n.y);
+      });
+    }
+
+    function buildAdjList(weighted = true) {
+      const adj = new Map();
+      nodes.forEach(n => adj.set(n.id, []));
+      edges.forEach(e => {
+        adj.get(e.from).push(weighted ? { to: e.to, weight: e.weight } : e.to);
+      });
+      return adj;
+    }
+
+    function startTraversal() {
+      const algo = document.getElementById("algo").value;
+      if (!nodes.length) return alert("Add nodes first");
+      traversalSteps = [];
+      currentStep = 0;
+
+      if (algo === "dfs") {
+        const visited = new Set();
+        function dfs(node) {
+          visited.add(node);
+          traversalSteps.push({ path: [...visited], current: node });
+          for (let neighbor of buildAdjList(false).get(node)) {
+            if (!visited.has(neighbor)) dfs(neighbor);
+          }
+        }
+        dfs(nodes[0].id);
+      }
+
+      else if (algo === "bfs") {
+        const adj = buildAdjList(false);
+        const visited = new Set();
+        const queue = [nodes[0].id];
+        visited.add(queue[0]);
+        while (queue.length) {
+          const node = queue.shift();
+          traversalSteps.push({ path: [...visited], current: node });
+          for (let neighbor of adj.get(node)) {
+            if (!visited.has(neighbor)) {
+              visited.add(neighbor);
+              queue.push(neighbor);
+            }
+          }
+        }
+      }
+
+      else if (algo === "dijkstra" || algo === "astar") {
+        const start = nodes[0];
+        const end = nodes[nodes.length - 1];
+        const dist = new Map(nodes.map(n => [n.id, Infinity]));
+        const prev = new Map();
+        const adj = buildAdjList(true);
+        const visited = new Set();
+        dist.set(start.id, 0);
+        const pq = [[0, start.id]];
+
+        function heuristic(a, b) {
+          const na = nodes.find(n => n.id === a);
+          const nb = nodes.find(n => n.id === b);
+          return Math.hypot(na.x - nb.x, na.y - nb.y);
+        }
+
+        while (pq.length) {
+          pq.sort((a, b) => a[0] - b[0]);
+          const [d, u] = pq.shift();
+          if (visited.has(u)) continue;
+          visited.add(u);
+          traversalSteps.push({ path: [...visited], current: u });
+
+          if (u === end.id) break;
+
+          for (let { to, weight } of adj.get(u)) {
+            const cost = d + weight + (algo === "astar" ? heuristic(to, end.id) : 0);
+            if (dist.get(to) > d + weight) {
+              dist.set(to, d + weight);
+              prev.set(to, u);
+              pq.push([cost, to]);
+            }
+          }
+        }
+      }
+
+      drawGraph();
+      playInterval = setInterval(() => stepTraversal(1), 700);
+    }
+
+    function stepTraversal(dir) {
+      if (traversalSteps.length === 0) return;
+      currentStep += dir;
+      currentStep = Math.max(0, Math.min(currentStep, traversalSteps.length - 1));
+      const { path, current } = traversalSteps[currentStep];
+      drawGraph(path, new Set(path));
+    }
+
+    function pauseTraversal() {
+      clearInterval(playInterval);
+    }
+
+    function resetGraph() {
+      nodes = [];
+      edges = [];
+      nodeId = 0;
+      history = [];
+      drawGraph();
+    }
+
+    function exportGraph() {
+      const data = { nodes, edges, nodeId };
+      const blob = new Blob([JSON.stringify(data)], { type: "application/json" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "graph.json";
+      a.click();
+    }
+
+    function importGraph(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = e => {
+        const data = JSON.parse(e.target.result);
+        nodes = data.nodes;
+        edges = data.edges;
+        nodeId = data.nodeId;
+        drawGraph();
+      };
+      reader.readAsText(file);
+    }
+
+    function checkCycle() {
+  const adj = buildAdjList(false);
+  const visited = new Set();
+  const recStack = new Set();
+
+  function dfs(node) {
+    visited.add(node);
+    recStack.add(node);
+    for (let neighbor of adj.get(node)) {
+      if (!visited.has(neighbor) && dfs(neighbor)) return true;
+      else if (recStack.has(neighbor)) return true;
+    }
+    recStack.delete(node);
+    return false;
+  }
+
+  for (let n of nodes) {
+    if (!visited.has(n.id) && dfs(n.id)) {
+      showAlert("Cycle Detected!", "error");
+      return;
+    }
+  }
+  showAlert("No Cycle Detected.", "success");
+}
+
+
+function checkConnectivity() {
+  const adj = buildAdjList(false);
+  const visited = new Set();
+
+  function dfs(node) {
+    visited.add(node);
+    for (let neighbor of adj.get(node)) {
+      if (!visited.has(neighbor)) dfs(neighbor);
+    }
+  }
+
+  dfs(nodes[0].id);
+  if (visited.size === nodes.length) {
+    showAlert("Graph is Connected", "success");
+  } else {
+    showAlert("Graph is Not Connected", "error");
+  }
+}
+function showAlert(message, type) {
+  const alertBox = document.createElement("div");
+  alertBox.classList.add("alert-box");
+  alertBox.classList.add(`alert-${type}`);
+  alertBox.innerHTML = `${message} <button class="alert-close-btn" onclick="closeAlert(this)">×</button>`;
+  document.body.appendChild(alertBox);
+  
+  alertBox.style.display = "block"; // Show the alert
+  
+  setTimeout(() => {
+    closeAlert(alertBox);
+  }, 2000); // Automatically close after 5 seconds
+}
+
+function closeAlert(alert) {
+  alert.style.display = "none";
+  alert.remove();
+}
+
+  </script>
+</body>
+</html>
