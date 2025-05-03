@@ -144,12 +144,56 @@
 .alert-close-btn:hover {
   color: #ff6347;
 }
+#demo-download {
+  margin-top: 10px;
+  margin-bottom: 20px;
+  text-align: center;
+  background-color: var(--panel-color);
+  padding: 15px 25px;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  box-shadow: 0 0 10px rgba(0, 188, 212, 0.1);
+  max-width: 600px;
+  width: 90%;
+}
+
+#demo-download h3 {
+  margin-bottom: 15px;
+  color: var(--accent-color);
+  font-size: 1.1rem;
+}
+
+#downloadBtn {
+  background-color: var(--bg-color);
+  border: 1px solid var(--accent-color);
+  color: var(--text-color);
+  font-size: 14px;
+  padding: 10px 20px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.2s ease, transform 0.1s ease;
+}
+
+#downloadBtn:hover {
+  background-color: var(--accent-hover);
+  color: #000;
+  transform: translateY(-2px);
+}
+
 
   </style>
   
 </head>
 <body>
   <h2>Graph Traversal Visualizer - Hruthwik M</h2>
+
+  <div id="demo-download">
+    <h3>If you need a demo graph file, you can download it here:</h3>
+    <a href="graph.json" download>
+      <button id="downloadBtn">Download graph.json</button>
+    </a>
+  </div>
+  
 
   <div id="controls">
     <button onclick="setMode('node')">Add Node</button>
