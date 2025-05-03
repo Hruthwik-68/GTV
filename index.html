@@ -188,10 +188,12 @@
   <h2>Graph Traversal Visualizer - Hruthwik M</h2>
 
   <div id="demo-download">
-    <h3>If you need a demo graph file, you can download it here:</h3>
+    <h3>To try the demo, you can either download and upload the graph, or just click 'Access Demo Graph' to view it directly: </h3>
     <a href="graph.json" download>
       <button id="downloadBtn">Download graph.json</button>
     </a>
+    <button id="accessDemoBtn">Access Demo Graph</button>
+
   </div>
   
 
@@ -222,6 +224,27 @@
   <canvas id="graphCanvas" width="1000" height="600"></canvas>
 
   <script>
+    document.getElementById("accessDemoBtn").addEventListener("click", () => {
+  fetch('graph.json') // Make sure this file is in the same directory
+    .then(response => {
+      if (!response.ok) throw new Error("Graph file not found");
+      return response.json();
+    })
+    .then(data => {
+      loadGraph(data); // visualize the graph
+    })
+    .catch(error => {
+      alert("Failed to load graph: " + error.message);
+    });
+});
+
+function loadGraph(data) {
+  nodes = data.nodes || [];
+  edges = data.edges || [];
+  drawGraph();
+}
+
+    
     const canvas = document.getElementById("graphCanvas");
     const ctx = canvas.getContext("2d");
     const radius = 20;
@@ -527,6 +550,8 @@ function closeAlert(alert) {
   alert.style.display = "none";
   alert.remove();
 }
+
+
 
   </script>
 </body>
